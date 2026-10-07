@@ -83,7 +83,7 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 <script>
 const TYPES={
  title:{n:'Judul & tanggal',f:[['title','Judul','i'],['sub','Tanggal','i']]},
- text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Untuk tabel pakai tombol Tambah tabel di bawah','t'],['hd','Judul kolom tabel (opsional, pisahkan pakai koma). Contoh: Nama Lokasi, Terminal ID, SIM Card','i']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
+ text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Untuk tabel pakai tombol Tambah tabel di bawah','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
  note:{n:'Catatan tambahan',f:[['h','Judul kotak','i'],['body','Isi (**tebal** pakai dua bintang)','t']]},
  photos:{n:'Laporan foto',f:[['h','Judul lampiran','i']],photos:1}
 };
@@ -108,7 +108,17 @@ async function save(){try{const d=await db();d.transaction('s','readwrite').obje
 async function load(){try{const d=await db();return await new Promise(ok=>{const r=d.transaction('s').objectStore('s').get('blocks');r.onsuccess=()=>ok(r.result);r.onerror=()=>ok(null)})}catch(e){return null}}
 
 function cells(l){return l.includes('\t')?l.split('\t'):l.split(',')}
-const hdArr=b=>String(b.hd||'').split(/[,\t]/).map(x=>x.trim()).filter(Boolean);
+function cols(b){
+ let m=b.g&&b.g[0]?b.g[0].length:0;
+ for(const l of String(b.body||'').split('\n')){if(l.includes('\t')||/ \| /.test(l))m=Math.max(m,(l.includes('\t')?l.split('\t'):l.split('|')).length)}
+ return m;
+}
+const hdArr=b=>{const v=b.hv||[];if(!v.some(x=>x&&x.trim()))return null;const n=cols(b)||v.length;return Array.from({length:n},(_,x)=>v[x]||'')};
+function hdInputs(b,i){
+ const n=cols(b);
+ if(!n)return '<div class="st">Setelah ada tabel, kolom isian untuk judul kolom muncul di sini.</div>';
+ return '<label>Judul kolom tabel (opsional, isi per kolom)</label><div class="gr"><table><tr>'+Array.from({length:n},(_,x)=>`<td><input type="text" data-i="${i}" data-hv="${x}" value="${esc((b.hv||[])[x]||'')}" placeholder="Kolom ${x+1}" aria-label="Judul kolom ${x+1}"></td>`).join('')+'</tr></table></div>';
+}
 function tbl(r,num,nh,hd){
  const H=hd&&hd.length?hd:null;nh=nh||r.length===1;
  const head=H||(nh?null:r[0]),rows=(H||nh)?r:r.slice(1);
@@ -152,13 +162,13 @@ function paper(){
 function gridEd(b,i){
  if(!b.g)return `<div class="gb"><button data-a="gadd" data-i="${i}">+ Tambah tabel</button></div>`;
  const rows=b.g.map((r,y)=>`<tr>${r.map((c,x)=>`<td><input type="text" data-i="${i}" data-r="${y}" data-c="${x}" value="${esc(c)}" aria-label="Baris ${y+1} kolom ${x+1}"></td>`).join('')}</tr>`).join('');
- return `<label>Tabel (baris pertama = header, kecuali Judul kolom di atas diisi). Bisa paste langsung dari Excel/Sheets ke sel mana pun</label><div class="gr"><table>${rows}</table></div><div class="gb"><button data-a="gr+" data-i="${i}">+ Baris</button><button data-a="gr-" data-i="${i}">− Baris</button><button data-a="gc+" data-i="${i}">+ Kolom</button><button data-a="gc-" data-i="${i}">− Kolom</button><button data-a="gdel" data-i="${i}">Hapus tabel</button></div>`;
+ return `<label>Tabel (baris pertama = header, kecuali Judul kolom diisi). Bisa paste langsung dari Excel/Sheets ke sel mana pun</label><div class="gr"><table>${rows}</table></div><div class="gb"><button data-a="gr+" data-i="${i}">+ Baris</button><button data-a="gr-" data-i="${i}">− Baris</button><button data-a="gc+" data-i="${i}">+ Kolom</button><button data-a="gc-" data-i="${i}">− Kolom</button><button data-a="gdel" data-i="${i}">Hapus tabel</button></div>`;
 }
 function editor(){
  $('#editor').innerHTML=blocks.map((b,i)=>{
   const T=TYPES[b.t];
   let h=T.f.map(([k,l,kind])=>`<label>${l}</label>`+(kind==='t'?`<textarea data-i="${i}" data-k="${k}">${esc(b[k])}</textarea>`:`<input type="text" data-i="${i}" data-k="${k}" value="${esc(b[k])}">`)).join('');
-  if(b.t==='text')h+=gridEd(b,i);
+  if(b.t==='text')h+=gridEd(b,i)+`<div id="hdc${i}">${hdInputs(b,i)}</div>`;
   if(T.ck)h+=T.ck.map(([k,l])=>`<label class="ck"><input type="checkbox" data-i="${i}" data-k="${k}" ${b[k]?'checked':''}> ${l}</label>`).join('');
   if(T.photos){
    h+=`<label>Jumlah kolom foto</label><select data-i="${i}" data-k="cols">${[1,2,3,4].map(n=>`<option ${(b.cols||3)==n?'selected':''}>${n}</option>`).join('')}</select>`;
@@ -184,9 +194,11 @@ $('#add').innerHTML=Object.entries(TYPES).filter(([k])=>k!=='title').map(([k,v])
 $('#add').onclick=e=>{const k=e.target.dataset.add;if(!k)return;blocks.push(k==='photos'?{t:k,cols:3,p:[]}:{t:k});all();$('#editor').lastElementChild?.scrollIntoView({block:'nearest'})};
 $('#editor').addEventListener('input',e=>{
  const d=e.target.dataset;if(d.i===undefined||d.up!==undefined)return;
+ if(d.hv!==undefined){const bb=blocks[d.i];bb.hv=bb.hv||[];bb.hv[d.hv]=e.target.value;paper();return}
  if(d.r!==undefined){blocks[d.i].g[d.r][d.c]=e.target.value;paper();return}
  const v=e.target.type==='checkbox'?(e.target.checked?1:0):e.target.value;
  if(d.j!==undefined)blocks[d.i].p[d.j].c=v;else blocks[d.i][d.k]=d.k==='cols'?+v:v;
+ if(d.k==='body'&&blocks[d.i].t==='text'){const c=$('#hdc'+d.i);if(c)c.innerHTML=hdInputs(blocks[d.i],d.i)}
  paper();
 });
 $('#editor').addEventListener('change',e=>{if(e.target.dataset.up!==undefined&&e.target.files.length){upload(+e.target.dataset.up,e.target.files);e.target.value=''}});
@@ -218,7 +230,7 @@ $('#print').onclick=()=>window.print();
 $('#newr').onclick=()=>{if(confirm('Mulai laporan baru? Isi laporan sekarang akan hilang.')){blocks=[{t:'title',title:'Warehouse Daily Report',sub:'Tanggal: '+today()}];all()}};
 $('#clrp').onclick=()=>{if(confirm('Hapus semua foto di laporan ini? Tabel dan teks tetap ada.')){blocks.forEach(b=>{if(b.p)b.p=[]});all()}};
 const conv=b=>b.t==='sec'?{t:'text',h:b.h}:b.t==='sub'?{t:'text',h:b.h,plain:1}:b.t==='table'?{t:'text',num:b.num,body:/\t/.test(b.rows||'')?b.rows:String(b.rows||'').replace(/,/g,'\t')}:b;
-(async()=>{const s=await load();blocks=Array.isArray(s)&&s.length?s.map(conv).filter(b=>TYPES[b.t]):SAMPLE();if(!blocks.length||blocks[0].t!=='title')blocks.unshift({t:'title',title:'Warehouse Daily Report',sub:'Tanggal: '+today()});all()})();
+(async()=>{const s=await load();blocks=Array.isArray(s)&&s.length?s.map(conv).map(b=>{if(b.t==='text'&&b.hd&&!b.hv)b.hv=String(b.hd).split(/[,\t]/).map(x=>x.trim());return b}).filter(b=>TYPES[b.t]):SAMPLE();if(!blocks.length||blocks[0].t!=='title')blocks.unshift({t:'title',title:'Warehouse Daily Report',sub:'Tanggal: '+today()});all()})();
 </script>
 </body>
 </html>
