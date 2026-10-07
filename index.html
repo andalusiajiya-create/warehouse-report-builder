@@ -113,15 +113,16 @@ function cols(b){
  for(const l of String(b.body||'').split('\n')){if(l.includes('\t')||/ \| /.test(l))m=Math.max(m,(l.includes('\t')?l.split('\t'):l.split('|')).length)}
  return m;
 }
-const hdArr=b=>{const v=b.hv||[];if(!v.some(x=>x&&x.trim()))return null;const n=cols(b)||v.length;return Array.from({length:n},(_,x)=>v[x]||'')};
+const hn=b=>b.hv&&b.hv.length?b.hv.length:cols(b);
+const hdArr=b=>{const v=b.hv||[];if(!v.some(x=>x&&x.trim()))return null;return Array.from(v,x=>x||'')};
 function hdInputs(b,i){
- const n=cols(b);
- if(!n)return '<div class="st">Setelah ada tabel, kolom isian untuk judul kolom muncul di sini.</div>';
- return '<label>Judul kolom tabel (opsional, isi per kolom)</label><div class="gr"><table><tr>'+Array.from({length:n},(_,x)=>`<td><input type="text" data-i="${i}" data-hv="${x}" value="${esc((b.hv||[])[x]||'')}" placeholder="Kolom ${x+1}" aria-label="Judul kolom ${x+1}"></td>`).join('')+'</tr></table></div>';
+ const n=hn(b);
+ if(!n)return '<div class="st">Setelah ada tabel, kotak isian untuk judul kolom muncul di sini.</div>';
+ return '<label>Judul kolom tabel (opsional, isi per kolom)</label><div class="gr"><table><tr>'+Array.from({length:n},(_,x)=>`<td><input type="text" data-i="${i}" data-hv="${x}" value="${esc((b.hv||[])[x]||'')}" placeholder="Kolom ${x+1}" aria-label="Judul kolom ${x+1}"></td>`).join('')+`</tr></table></div><div class="gb"><button data-a="hc+" data-i="${i}">+ Kolom</button><button data-a="hc-" data-i="${i}">− Kolom</button></div>`;
 }
 function tbl(r,num,nh,hd){
  const H=hd&&hd.length?hd:null;nh=nh||r.length===1;
- const head=H||(nh?null:r[0]),rows=(H||nh)?r:r.slice(1);
+ const head=H||(nh?null:r[0]);let rows=(H||nh)?r:r.slice(1);if(H)rows=rows.map(x=>Array.from({length:H.length},(_,k)=>x[k]==null?'':x[k]));
  const th=head?'<thead><tr>'+(num?'<th style="width:36px">No</th>':'')+head.map(c=>`<th>${esc(c.trim())}</th>`).join('')+'</tr></thead>':'';
  const tb=rows.map((x,i)=>`<tr>${num?`<td>${i+1}</td>`:''}${x.map(c=>`<td>${esc(c.trim())}</td>`).join('')}</tr>`).join('');
  return `<table>${th}<tbody>${tb}</tbody></table>`;
@@ -194,7 +195,7 @@ $('#add').innerHTML=Object.entries(TYPES).filter(([k])=>k!=='title').map(([k,v])
 $('#add').onclick=e=>{const k=e.target.dataset.add;if(!k)return;blocks.push(k==='photos'?{t:k,cols:3,p:[]}:{t:k});all();$('#editor').lastElementChild?.scrollIntoView({block:'nearest'})};
 $('#editor').addEventListener('input',e=>{
  const d=e.target.dataset;if(d.i===undefined||d.up!==undefined)return;
- if(d.hv!==undefined){const bb=blocks[d.i];bb.hv=bb.hv||[];bb.hv[d.hv]=e.target.value;paper();return}
+ if(d.hv!==undefined){const bb=blocks[d.i];if(!bb.hv)bb.hv=Array.from({length:cols(bb)},()=>'');bb.hv[d.hv]=e.target.value;paper();return}
  if(d.r!==undefined){blocks[d.i].g[d.r][d.c]=e.target.value;paper();return}
  const v=e.target.type==='checkbox'?(e.target.checked?1:0):e.target.value;
  if(d.j!==undefined)blocks[d.i].p[d.j].c=v;else blocks[d.i][d.k]=d.k==='cols'?+v:v;
@@ -221,6 +222,9 @@ $('#editor').addEventListener('click',e=>{
  if(a==='gc+')bk.g.forEach(r=>r.push(''));
  if(a==='gc-'&&bk.g[0].length>1)bk.g.forEach(r=>r.pop());
  if(a==='gdel')delete bk.g;
+ if(a==='gc+'&&bk.hv)bk.hv.push('');
+ if(a==='gc-'&&bk.hv&&bk.g&&bk.g[0].length<bk.hv.length)bk.hv.pop();
+ if(a==='hc+'||a==='hc-'){if(!bk.hv)bk.hv=Array.from({length:cols(bk)},()=>'');if(a==='hc+')bk.hv.push('');else if(bk.hv.length>1)bk.hv.pop();bk.hn=1}
  if(a==='up')mv(blocks,i,i-1);if(a==='dn')mv(blocks,i,i+1);
  if(a==='pup')mv(blocks[i].p,j,j-1);if(a==='pdn')mv(blocks[i].p,j,j+1);
  if(a==='pdel')blocks[i].p.splice(j,1);
@@ -230,7 +234,7 @@ $('#print').onclick=()=>window.print();
 $('#newr').onclick=()=>{if(confirm('Mulai laporan baru? Isi laporan sekarang akan hilang.')){blocks=[{t:'title',title:'Warehouse Daily Report',sub:'Tanggal: '+today()}];all()}};
 $('#clrp').onclick=()=>{if(confirm('Hapus semua foto di laporan ini? Tabel dan teks tetap ada.')){blocks.forEach(b=>{if(b.p)b.p=[]});all()}};
 const conv=b=>b.t==='sec'?{t:'text',h:b.h}:b.t==='sub'?{t:'text',h:b.h,plain:1}:b.t==='table'?{t:'text',num:b.num,body:/\t/.test(b.rows||'')?b.rows:String(b.rows||'').replace(/,/g,'\t')}:b;
-(async()=>{const s=await load();blocks=Array.isArray(s)&&s.length?s.map(conv).map(b=>{if(b.t==='text'&&b.hd&&!b.hv)b.hv=String(b.hd).split(/[,\t]/).map(x=>x.trim());return b}).filter(b=>TYPES[b.t]):SAMPLE();if(!blocks.length||blocks[0].t!=='title')blocks.unshift({t:'title',title:'Warehouse Daily Report',sub:'Tanggal: '+today()});all()})();
+(async()=>{const s=await load();blocks=Array.isArray(s)&&s.length?s.map(conv).map(b=>{if(b.t==='text'&&b.hd&&!b.hv)b.hv=String(b.hd).split(/[,\t]/).map(x=>x.trim());if(b.t==='text'&&b.hv&&!b.hn){const n=cols(b);b.hv=Array.from({length:Math.max(n,b.hv.length)},(_,x)=>b.hv[x]||'')}return b}).filter(b=>TYPES[b.t]):SAMPLE();if(!blocks.length||blocks[0].t!=='title')blocks.unshift({t:'title',title:'Warehouse Daily Report',sub:'Tanggal: '+today()});all()})();
 </script>
 </body>
 </html>
