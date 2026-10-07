@@ -32,30 +32,32 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 .ph{display:grid;grid-template-columns:48px 1fr auto;gap:6px;align-items:center;margin-top:6px}
 .ph img{width:48px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--line)}
 .ph div{display:flex;gap:2px}.ph button{padding:2px 6px;font-size:12px}
+.gr{overflow:auto;margin-top:6px}.gr table{border-collapse:collapse}.gr td{padding:0}.gr input[type=text]{width:112px;padding:3px 5px;font-size:12px;border-radius:0}.gr tr:first-child input{font-weight:700}.gb{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.gb button{padding:2px 8px;font-size:12px}
 .st{font-size:12px;color:var(--mute);margin-top:4px}
 .stage{padding:24px;overflow:auto}
 .paper{width:210mm;max-width:100%;min-height:297mm;margin:0 auto;background:#fff;color:#111;padding:14mm 15mm;box-shadow:0 2px 14px rgba(0,0,0,.2);font:12px/1.45 Arial,Helvetica,sans-serif}
-.paper h1{font-size:28px;color:#2f9e33;margin:0}
-.paper .sub{color:#888;margin:2px 0 14px;font-size:12px}
-.paper h2{font-size:15px;margin:16px 0 6px}
-.paper h3{font-size:13px;margin:14px 0 6px}
-.paper p{margin:6px 0;white-space:pre-wrap}
+.paper h1{font-size:27px;font-weight:800;letter-spacing:-.01em;color:#2f9e33;margin:0;line-height:1.15}
+.paper .sub{font-size:13px;font-weight:700;color:#2b2f36;margin:6px 0 18px;padding-bottom:10px;border-bottom:3px solid #2f9e33}
+.paper h2{font-size:15px;font-weight:700;margin:22px 0 8px;padding-left:9px;border-left:4px solid #2f9e33;color:#1c2433;break-after:avoid}
+.paper h3{font-size:13px;font-weight:700;margin:16px 0 6px;color:#1f7a24;break-after:avoid}
+.paper p{margin:6px 0;white-space:pre-wrap;color:#222;line-height:1.55}
 .paper table{border-collapse:collapse;width:100%;margin:6px 0 10px}
-.paper th,.paper td{border:1px solid #d5d9d5;padding:4px 8px;text-align:left;vertical-align:top}
-.paper th{background:#2f9e33;color:#fff}
-.paper tbody tr:nth-child(even){background:#e8f5e3}
+.paper th,.paper td{border:1px solid #d9e0d8;padding:5px 9px;text-align:left;vertical-align:top;font-size:11.5px}
+.paper th{background:#2a8a2e;color:#fff;font-weight:700}
+.paper tbody tr:nth-child(even){background:#eff7ec}
 .paper tr{break-inside:avoid}
 .note{background:#fff8e1;border:1px solid #f0b400;border-left-width:3px;padding:8px 12px;margin:10px 0;break-inside:avoid}
 .note b.t{display:block;color:#8a5a00;margin-bottom:4px;font-size:12.5px}
-.cap{font-size:12px;font-weight:700;margin:12px 0 6px}
+.cap{font-size:12px;font-weight:700;margin:16px 0 6px;color:#1c2433;break-after:avoid}
 .grid{display:grid;border-top:1px solid #d5d9d5;border-left:1px solid #d5d9d5;margin-bottom:10px}
 .cell{border-right:1px solid #d5d9d5;border-bottom:1px solid #d5d9d5;padding:8px 6px 6px;text-align:center;break-inside:avoid;display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:6px}
 .cell img{max-width:100%;max-height:62mm;object-fit:contain;display:block}
 .cell.w img{max-height:150mm}
-.cell span{font-size:10px}
+.cell span{font-size:10px;color:#444}
 .empty{color:#999;font-style:italic}
 @media (max-width:900px){.app{grid-template-columns:1fr}.side{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}.stage{padding:10px}.paper{padding:8mm}}
 @media print{
+ *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
  body{background:#fff}.side{display:none}.app{display:block}
  .stage{padding:0;overflow:visible}
  .paper{box-shadow:none;width:auto;min-height:0;margin:0;padding:0}
@@ -80,7 +82,7 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 <script>
 const TYPES={
  title:{n:'Judul & tanggal',f:[['title','Judul','i'],['sub','Tanggal','i']]},
- text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi laporan. Tempel tabel dari Excel/Sheets langsung di sini, otomatis jadi tabel. **tebal** pakai dua bintang','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis']]},
+ text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Untuk tabel pakai tombol Tambah tabel di bawah','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
  note:{n:'Catatan tambahan',f:[['h','Judul kotak','i'],['body','Isi (**tebal** pakai dua bintang)','t']]},
  photos:{n:'Laporan foto',f:[['h','Judul lampiran','i']],photos:1}
 };
@@ -105,15 +107,16 @@ async function save(){try{const d=await db();d.transaction('s','readwrite').obje
 async function load(){try{const d=await db();return await new Promise(ok=>{const r=d.transaction('s').objectStore('s').get('blocks');r.onsuccess=()=>ok(r.result);r.onerror=()=>ok(null)})}catch(e){return null}}
 
 function cells(l){return l.includes('\t')?l.split('\t'):l.split(',')}
-function tbl(r,num){
- const th=(num?'<th style="width:36px">No</th>':'')+r[0].map(c=>`<th>${esc(c.trim())}</th>`).join('');
- const tb=r.slice(1).map((x,i)=>`<tr>${num?`<td>${i+1}</td>`:''}${x.map(c=>`<td>${esc(c.trim())}</td>`).join('')}</tr>`).join('');
- return `<table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>`;
+function tbl(r,num,nh){
+ nh=nh||r.length===1;
+ const th=nh?'':'<thead><tr>'+(num?'<th style="width:36px">No</th>':'')+r[0].map(c=>`<th>${esc(c.trim())}</th>`).join('')+'</tr></thead>';
+ const tb=(nh?r:r.slice(1)).map((x,i)=>`<tr>${num?`<td>${i+1}</td>`:''}${x.map(c=>`<td>${esc(c.trim())}</td>`).join('')}</tr>`).join('');
+ return `<table>${th}<tbody>${tb}</tbody></table>`;
 }
 function bodyHtml(b){
  let out='',para=[],tb=[];
  const fp=()=>{if(para.length){out+=`<p>${rich(para.join('\n'))}</p>`;para=[]}};
- const ft=()=>{if(tb.length){out+=tbl(tb,b.num);tb=[]}};
+ const ft=()=>{if(tb.length){out+=tbl(tb,b.num,b.nohead);tb=[]}};
  for(const l of String(b.body||'').split('\n')){
   const t=l.trim();
   if(l.includes('\t')||/ \| /.test(l)){fp();tb.push(l.includes('\t')?l.split('\t'):l.split('|'))}
@@ -127,7 +130,7 @@ function renderBlock(b,ctx){
  if(b.t==='text'){
   let hd='';
   if(b.h){if(b.plain)hd=`<h3>${esc(b.h)}</h3>`;else{ctx.n++;hd=`<h2>${ctx.n}. ${esc(b.h)}</h2>`}}
-  return hd+(bodyHtml(b)||(b.h?'':'<p class="empty">Laporan kosong</p>'));
+  return hd+(bodyHtml(b)||(b.g||b.h?'':'<p class="empty">Laporan kosong</p>'))+(b.g?tbl(b.g,b.num,b.nohead):'');
  }
  if(b.t==='note')return `<div class="note"><b class="t">${esc(b.h)}</b>${rich(b.body)}</div>`;
  if(b.t==='photos'){
@@ -143,10 +146,16 @@ function paper(){
  $('#pg').textContent=`@page{size:A4;margin:14mm 15mm 18mm;@bottom-left{content:"${ft.replace(/["\\\n]/g,' ')}";font:9pt Arial;color:#888}@bottom-right{content:"Hal. " counter(page);font:9pt Arial;color:#888}}`;
  save();
 }
+function gridEd(b,i){
+ if(!b.g)return `<div class="gb"><button data-a="gadd" data-i="${i}">+ Tambah tabel</button></div>`;
+ const rows=b.g.map((r,y)=>`<tr>${r.map((c,x)=>`<td><input type="text" data-i="${i}" data-r="${y}" data-c="${x}" value="${esc(c)}" aria-label="Baris ${y+1} kolom ${x+1}"></td>`).join('')}</tr>`).join('');
+ return `<label>Tabel (baris pertama = header). Bisa paste langsung dari Excel/Sheets ke sel mana pun</label><div class="gr"><table>${rows}</table></div><div class="gb"><button data-a="gr+" data-i="${i}">+ Baris</button><button data-a="gr-" data-i="${i}">− Baris</button><button data-a="gc+" data-i="${i}">+ Kolom</button><button data-a="gc-" data-i="${i}">− Kolom</button><button data-a="gdel" data-i="${i}">Hapus tabel</button></div>`;
+}
 function editor(){
  $('#editor').innerHTML=blocks.map((b,i)=>{
   const T=TYPES[b.t];
   let h=T.f.map(([k,l,kind])=>`<label>${l}</label>`+(kind==='t'?`<textarea data-i="${i}" data-k="${k}">${esc(b[k])}</textarea>`:`<input type="text" data-i="${i}" data-k="${k}" value="${esc(b[k])}">`)).join('');
+  if(b.t==='text')h+=gridEd(b,i);
   if(T.ck)h+=T.ck.map(([k,l])=>`<label class="ck"><input type="checkbox" data-i="${i}" data-k="${k}" ${b[k]?'checked':''}> ${l}</label>`).join('');
   if(T.photos){
    h+=`<label>Jumlah kolom foto</label><select data-i="${i}" data-k="cols">${[1,2,3,4].map(n=>`<option ${(b.cols||3)==n?'selected':''}>${n}</option>`).join('')}</select>`;
@@ -172,15 +181,31 @@ $('#add').innerHTML=Object.entries(TYPES).filter(([k])=>k!=='title').map(([k,v])
 $('#add').onclick=e=>{const k=e.target.dataset.add;if(!k)return;blocks.push(k==='photos'?{t:k,cols:3,p:[]}:{t:k});all();$('#editor').lastElementChild?.scrollIntoView({block:'nearest'})};
 $('#editor').addEventListener('input',e=>{
  const d=e.target.dataset;if(d.i===undefined||d.up!==undefined)return;
+ if(d.r!==undefined){blocks[d.i].g[d.r][d.c]=e.target.value;paper();return}
  const v=e.target.type==='checkbox'?(e.target.checked?1:0):e.target.value;
  if(d.j!==undefined)blocks[d.i].p[d.j].c=v;else blocks[d.i][d.k]=d.k==='cols'?+v:v;
  paper();
 });
 $('#editor').addEventListener('change',e=>{if(e.target.dataset.up!==undefined&&e.target.files.length){upload(+e.target.dataset.up,e.target.files);e.target.value=''}});
+$('#editor').addEventListener('paste',e=>{
+ const d=e.target.dataset;if(d.r===undefined)return;
+ const t=(e.clipboardData||window.clipboardData).getData('text');if(!/[\t\n]/.test(t.replace(/\n+$/,'')))return;
+ e.preventDefault();const g=blocks[d.i].g,r0=+d.r,c0=+d.c;
+ const rows=t.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(l=>l.split('\t'));
+ rows.forEach((row,y)=>{while(g.length<=r0+y)g.push(g[0].map(()=>''));row.forEach((v,x)=>{while(g[0].length<=c0+x)g.forEach(q=>q.push(''));g[r0+y][c0+x]=v})});
+ all();
+});
 $('#editor').addEventListener('click',e=>{
  const t=e.target.closest('button[data-a]');if(!t)return;const a=t.dataset.a,i=+t.dataset.i,j=+t.dataset.j;
  const mv=(arr,x,y)=>{if(y>=0&&y<arr.length)[arr[x],arr[y]]=[arr[y],arr[x]]};
  if(a==='del')blocks.splice(i,1);
+ const bk=blocks[i];
+ if(a==='gadd')bk.g=[['','',''],['','',''],['','','']];
+ if(a==='gr+')bk.g.push(bk.g[0].map(()=>''));
+ if(a==='gr-'&&bk.g.length>1)bk.g.pop();
+ if(a==='gc+')bk.g.forEach(r=>r.push(''));
+ if(a==='gc-'&&bk.g[0].length>1)bk.g.forEach(r=>r.pop());
+ if(a==='gdel')delete bk.g;
  if(a==='up')mv(blocks,i,i-1);if(a==='dn')mv(blocks,i,i+1);
  if(a==='pup')mv(blocks[i].p,j,j-1);if(a==='pdn')mv(blocks[i].p,j,j+1);
  if(a==='pdel')blocks[i].p.splice(j,1);
