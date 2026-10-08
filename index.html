@@ -108,11 +108,16 @@ async function save(){try{const d=await db();d.transaction('s','readwrite').obje
 async function load(){try{const d=await db();return await new Promise(ok=>{const r=d.transaction('s').objectStore('s').get('blocks');r.onsuccess=()=>ok(r.result);r.onerror=()=>ok(null)})}catch(e){return null}}
 
 function cells(l){return l.includes('\t')?l.split('\t'):l.split(',')}
+const idre=/[A-Za-z]{2,6}_\d{6,}/;
+function splitId(c){
+ const m=c.match(idre);if(!m)return [c];
+ const i=c.indexOf(m[0]),bf=c.slice(0,i).trim(),af=c.slice(i+m[0].length).trim();
+ return [...(bf?[bf]:[]),m[0],...(af?af.split(/\s{2,}/):[])];
+}
 function splitRow(l){
- if(l.includes('\t'))return l.split('\t');
+ if(l.includes('\t'))return l.split('\t').flatMap(splitId);
  if(/ \| /.test(l))return l.split('|');
- const m=l.match(/[A-Za-z]{2,6}_\d{6,}/);
- if(m){const i=l.indexOf(m[0]),bf=l.slice(0,i).trim(),af=l.slice(i+m[0].length).trim();return [bf,m[0],...(af?af.split(/\s{2,}/):[])]}
+ if(idre.test(l))return splitId(l);
  return null;
 }
 function cols(b){
