@@ -115,7 +115,7 @@ function splitId(c){
  return [...(bf?[bf]:[]),m[0],...(af?af.split(/\s{2,}/):[])];
 }
 function splitRow(l){
- if(l.includes('\t'))return l.split('\t').flatMap(splitId);
+ if(l.includes('\t'))return l.split('\t').flatMap(splitId).flatMap(c=>String(c).trim().split(/\s{2,}/));
  if(/ \| /.test(l))return l.split('|');
  if(idre.test(l))return splitId(l);
  return null;
