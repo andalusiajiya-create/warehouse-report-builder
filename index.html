@@ -83,7 +83,7 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 <script>
 const TYPES={
  title:{n:'Judul & tanggal',f:[['title','Judul','i'],['sub','Tanggal','i']]},
- text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Untuk tabel pakai tombol Tambah tabel di bawah','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
+ text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Baris yang ada Terminal ID (nas_..., ldx_..., dst) otomatis dipecah jadi kolom. Tabel lain: tombol Tambah tabel','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
  note:{n:'Catatan tambahan',f:[['h','Judul kotak','i'],['body','Isi (**tebal** pakai dua bintang)','t']]},
  photos:{n:'Laporan foto',f:[['h','Judul lampiran','i']],photos:1}
 };
@@ -108,23 +108,33 @@ async function save(){try{const d=await db();d.transaction('s','readwrite').obje
 async function load(){try{const d=await db();return await new Promise(ok=>{const r=d.transaction('s').objectStore('s').get('blocks');r.onsuccess=()=>ok(r.result);r.onerror=()=>ok(null)})}catch(e){return null}}
 
 function cells(l){return l.includes('\t')?l.split('\t'):l.split(',')}
+function splitRow(l){
+ if(l.includes('\t'))return l.split('\t');
+ if(/ \| /.test(l))return l.split('|');
+ const m=l.match(/[A-Za-z]{2,6}_\d{6,}/);
+ if(m){const i=l.indexOf(m[0]),bf=l.slice(0,i).trim(),af=l.slice(i+m[0].length).trim();return [bf,m[0],...(af?af.split(/\s{2,}/):[])]}
+ return null;
+}
 function cols(b){
  let m=b.g&&b.g[0]?b.g[0].length:0;
- for(const l of String(b.body||'').split('\n')){if(l.includes('\t')||/ \| /.test(l))m=Math.max(m,(l.includes('\t')?l.split('\t'):l.split('|')).length)}
+ for(const l of String(b.body||'').split('\n')){const r=splitRow(l);if(r)m=Math.max(m,r.length)}
  return m;
 }
-const hn=b=>b.hv&&b.hv.length?b.hv.length:cols(b);
+const hn=b=>cols(b)?(b.hv&&b.hv.length?b.hv.length:cols(b)):0;
 const hdArr=b=>{const v=b.hv||[];if(!v.some(x=>x&&x.trim()))return null;return Array.from(v,x=>x||'')};
 function hdInputs(b,i){
  const n=hn(b);
- if(!n)return '<div class="st">Setelah ada tabel, kotak isian untuk judul kolom muncul di sini.</div>';
+ if(!n)return '<div class="st">Judul kolom: kotak isiannya muncul di sini setelah ada tabel (dari paste Excel/Sheets, baris dengan Terminal ID, atau tombol Tambah tabel).</div>';
  return '<label>Judul kolom tabel (opsional, isi per kolom)</label><div class="gr"><table><tr>'+Array.from({length:n},(_,x)=>`<td><input type="text" data-i="${i}" data-hv="${x}" value="${esc((b.hv||[])[x]||'')}" placeholder="Kolom ${x+1}" aria-label="Judul kolom ${x+1}"></td>`).join('')+`</tr></table></div><div class="gb"><button data-a="hc+" data-i="${i}">+ Kolom</button><button data-a="hc-" data-i="${i}">− Kolom</button></div>`;
 }
 function tbl(r,num,nh,hd){
  const H=hd&&hd.length?hd:null;nh=nh||r.length===1;
- const head=H||(nh?null:r[0]);let rows=(H||nh)?r:r.slice(1);if(H)rows=rows.map(x=>Array.from({length:H.length},(_,k)=>x[k]==null?'':x[k]));
- const th=head?'<thead><tr>'+(num?'<th style="width:36px">No</th>':'')+head.map(c=>`<th>${esc(c.trim())}</th>`).join('')+'</tr></thead>':'';
- const tb=rows.map((x,i)=>`<tr>${num?`<td>${i+1}</td>`:''}${x.map(c=>`<td>${esc(c.trim())}</td>`).join('')}</tr>`).join('');
+ let head=H||(nh?null:r[0]);let rows=(H||nh)?r:r.slice(1);
+ const n=Math.max(head?head.length:0,...rows.map(x=>x.length));
+ const pad=x=>Array.from({length:n},(_,k)=>x[k]==null?'':x[k]);
+ rows=rows.map(pad);if(head)head=pad(head);
+ const th=head?'<thead><tr>'+(num?'<th style="width:36px">No</th>':'')+head.map(c=>`<th>${esc(String(c).trim())}</th>`).join('')+'</tr></thead>':'';
+ const tb=rows.map((x,i)=>`<tr>${num?`<td>${i+1}</td>`:''}${x.map(c=>`<td>${esc(String(c).trim())}</td>`).join('')}</tr>`).join('');
  return `<table>${th}<tbody>${tb}</tbody></table>`;
 }
 function bodyHtml(b){
@@ -133,7 +143,8 @@ function bodyHtml(b){
  const ft=()=>{if(tb.length){out+=tbl(tb,b.num,b.nohead,hdArr(b));tb=[]}};
  for(const l of String(b.body||'').split('\n')){
   const t=l.trim();
-  if(l.includes('\t')||/ \| /.test(l)){fp();tb.push(l.includes('\t')?l.split('\t'):l.split('|'))}
+  const sr=splitRow(l);
+  if(sr){fp();tb.push(sr)}
   else if(!t){fp();ft()}
   else{ft();para.push(t)}
  }
