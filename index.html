@@ -83,7 +83,7 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 <script>
 const TYPES={
  title:{n:'Judul & tanggal',f:[['title','Judul','i'],['sub','Tanggal','i']]},
- text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Baris yang ada Terminal ID (nas_..., ldx_..., dst) otomatis dipecah jadi kolom. Tabel lain: tombol Tambah tabel','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
+ text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Baris yang ada Terminal ID (nas_..., ldx_..., dst) otomatis dipecah jadi kolom. Kalau ada tabel dari tombol Tambah tabel, baris ini digabung ke tabel itu (jadi satu tabel)','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['nohead','Tabel: tanpa baris header (semua baris = data)']]},
  note:{n:'Catatan tambahan',f:[['h','Judul kotak','i'],['body','Isi (**tebal** pakai dua bintang)','t']]},
  photos:{n:'Laporan foto',f:[['h','Judul lampiran','i']],photos:1}
 };
@@ -138,9 +138,9 @@ function tbl(r,num,nh,hd){
  return `<table>${th}<tbody>${tb}</tbody></table>`;
 }
 function bodyHtml(b){
- let out='',para=[],tb=[];
+ let out='',para=[],tb=[],mr=[];
  const fp=()=>{if(para.length){out+=`<p>${rich(para.join('\n'))}</p>`;para=[]}};
- const ft=()=>{if(tb.length){out+=tbl(tb,b.num,b.nohead,hdArr(b));tb=[]}};
+ const ft=()=>{if(tb.length){if(b.g)mr.push(...tb);else out+=tbl(tb,b.num,b.nohead,hdArr(b));tb=[]}};
  for(const l of String(b.body||'').split('\n')){
   const t=l.trim();
   const sr=splitRow(l);
@@ -148,14 +148,15 @@ function bodyHtml(b){
   else if(!t){fp();ft()}
   else{ft();para.push(t)}
  }
- fp();ft();return out;
+ fp();ft();return {html:out,rows:mr};
 }
 function renderBlock(b,ctx){
  if(b.t==='title')return `<div class="hd"><h1>${esc(b.title)||'Judul laporan'}</h1><div class="sub">${esc(b.sub)}</div></div>`;
  if(b.t==='text'){
   let hd='';
   if(b.h){if(b.plain)hd=`<h3>${esc(b.h)}</h3>`;else{ctx.n++;hd=`<h2>${ctx.n}. ${esc(b.h)}</h2>`}}
-  return hd+(bodyHtml(b)||(b.g||b.h?'':'<p class="empty">Laporan kosong</p>'))+(b.g?tbl(b.g,b.num,b.nohead,hdArr(b)):'');
+  const bh=bodyHtml(b);
+  return hd+(bh.html||(b.g||b.h?'':'<p class="empty">Laporan kosong</p>'))+(b.g?tbl([...b.g,...bh.rows],b.num,b.nohead,hdArr(b)):'');
  }
  if(b.t==='note')return `<div class="note"><b class="t">${esc(b.h)}</b>${rich(b.body)}</div>`;
  if(b.t==='photos'){
