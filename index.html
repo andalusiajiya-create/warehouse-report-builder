@@ -63,12 +63,9 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 .note b.t{display:block;color:#8a5a00;margin-bottom:4px;font-size:12.5px}
 .cap{font-size:13px;font-weight:700;margin:24px 0 10px;color:#232f3e;break-after:avoid}
 .grid{display:grid;gap:24px 18px;margin:14px 0 22px}
-.cell{break-inside:avoid}
-.cell .im{background:#f3f4f6;border:1px dashed #cfd3da;display:flex;align-items:center;justify-content:center;padding:10px}
-.cell img{max-width:100%;max-height:68mm;object-fit:contain;display:block}
-.cell:not(.w) .im{aspect-ratio:1.15}
-.cell:not(.w) .im img{max-height:100%}
-.cell.w img{max-height:150mm}
+.cell{break-inside:avoid;display:flex;flex-direction:column}
+.cell .im{flex:1;background:#f3f4f6;border:1px dashed #cfd3da;display:flex;align-items:center;justify-content:center;padding:6px}
+.cell img{max-width:100%;max-height:var(--ih,110mm);object-fit:contain;display:block}
 .cell span{display:block;font-size:10px;line-height:1.5;color:#7e8490;margin-top:8px;text-align:left}
 .empty{color:#999;font-style:italic}
 @media (max-width:900px){.app{grid-template-columns:1fr}.side{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line)}.stage{padding:10px}}
@@ -196,7 +193,7 @@ function renderBlock(b,ctx){
  if(b.t==='note')return `<div class="note"><b class="t">${esc(b.h)}</b>${rich(b.body)}</div>`;
  if(b.t==='photos'){
   const p=b.p||[],c=b.cols||3;
-  return (b.pb?'<div class="pb"></div>':'')+(b.h?`<div class="cap">${esc(b.h)}</div>`:'')+(p.length?`<div class="grid" style="grid-template-columns:repeat(${c},1fr)">${p.map((x,j)=>`<div class="cell${c==1?' w':''}"><div class="im"><img src="${x.s}" alt="${esc(x.c)}"></div><span>${esc(b.cn?'Foto '+(j+1)+'. '+x.c:x.c)}</span></div>`).join('')}</div>`:'<p class="empty">Belum ada foto, upload dari panel kiri</p>');
+  return (b.pb?'<div class="pb"></div>':'')+(b.h?`<div class="cap">${esc(b.h)}</div>`:'')+(p.length?`<div class="grid" style="grid-template-columns:repeat(${c},1fr);--ih:${({1:'172mm',2:'118mm',3:'80mm',4:'60mm'})[c]||'110mm'}">${p.map((x,j)=>`<div class="cell${c==1?' w':''}"><div class="im"><img src="${x.s}" alt="${esc(x.c)}"></div><span>${esc(b.cn?'Foto '+(j+1)+'. '+x.c:x.c)}</span></div>`).join('')}</div>`:'<p class="empty">Belum ada foto, upload dari panel kiri</p>');
  }
  return '';
 }
@@ -222,7 +219,7 @@ function editor(){
   if(b.t==='text')h+=gridEd(b,i)+`<div id="hdc${i}">${hdInputs(b,i)}</div>`;
   if(T.ck)h+=T.ck.map(([k,l])=>`<label class="ck"><input type="checkbox" data-i="${i}" data-k="${k}" ${b[k]?'checked':''}> ${l}</label>`).join('');
   if(T.photos){
-   h+=`<label>Jumlah kolom foto</label><select data-i="${i}" data-k="cols">${[1,2,3,4].map(n=>`<option ${(b.cols||3)==n?'selected':''}>${n}</option>`).join('')}</select>`;
+   h+=`<label>Jumlah kolom foto</label><select data-i="${i}" data-k="cols">${[1,2,3,4].map(n=>`<option value="${n}" ${(b.cols||3)==n?'selected':''}>${n}${n==1?' kolom (paling besar)':n==2?' kolom (besar)':n==3?' kolom':' kolom (kecil)'}</option>`).join('')}</select>`;
    h+=`<label>Upload foto (bisa pilih banyak sekaligus)</label><input type="file" accept="image/*" multiple data-up="${i}"><div class="st" id="st${i}">${(b.p||[]).length} foto</div>`;
    h+=(b.p||[]).map((x,j)=>`<div class="ph"><img src="${x.s}" alt=""><input type="text" data-i="${i}" data-j="${j}" value="${esc(x.c)}"><div><button data-a="pup" data-i="${i}" data-j="${j}" aria-label="Naik">↑</button><button data-a="pdn" data-i="${i}" data-j="${j}" aria-label="Turun">↓</button><button data-a="pdel" data-i="${i}" data-j="${j}" aria-label="Hapus foto">✕</button></div></div>`).join('');
   }
@@ -231,7 +228,7 @@ function editor(){
 function all(){editor();paper()}
 
 /* foto: perkecil dulu supaya PDF dan penyimpanan tidak berat */
-function shrink(file){return new Promise(ok=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const m=1100,k=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.78))};im.onerror=()=>{URL.revokeObjectURL(u);ok(null)};im.src=u})}
+function shrink(file){return new Promise(ok=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const m=2000,k=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c.toDataURL('image/jpeg',.88))};im.onerror=()=>{URL.revokeObjectURL(u);ok(null)};im.src=u})}
 async function upload(i,files){
  const b=blocks[i];b.p=b.p||[];const fs=[...files].sort((a,c)=>a.name.localeCompare(c.name,undefined,{numeric:true}));
  for(let n=0;n<fs.length;n++){
