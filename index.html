@@ -61,7 +61,7 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 .paper h1.lh{margin-top:2mm}
 .note{background:#fff8e1;border:1px solid #f0b400;border-left-width:3px;padding:14px 18px;margin:20px 0;break-inside:avoid}
 .note b.t{display:block;color:#8a5a00;margin-bottom:4px;font-size:12.5px}
-.cap{font-size:13px;font-weight:700;margin:24px 0 10px;color:#232f3e;break-after:avoid}
+.cap{font-size:16px;font-weight:700;margin:34px 0 14px;color:#232f3e;break-after:avoid}
 .grid{display:grid;gap:24px 18px;margin:14px 0 22px}
 .cell{break-inside:avoid;display:flex;flex-direction:column}
 .cell .im{flex:1;background:#f3f4f6;border:1px dashed #cfd3da;display:flex;align-items:center;justify-content:center;padding:6px}
@@ -96,9 +96,10 @@ textarea{min-height:90px;resize:vertical;font-family:ui-monospace,Menlo,Consolas
 <script>
 const TYPES={
  title:{n:'Judul & header halaman',f:[['title','Judul','i'],['sub','Tanggal / sub-judul','i'],['hl','Header kiri (tiap halaman)','i'],['hr','Header kanan (tiap halaman)','i'],['fl','Footer kiri (tiap halaman)','i']]},
- text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Baris yang ada Terminal ID (nas_..., ldx_..., RCHT..., dst) otomatis dipecah jadi kolom. Kalau ada tabel dari tombol Tambah tabel, baris ini digabung ke tabel itu (jadi satu tabel)','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['sp','Tabel: setiap spasi = kolom baru (untuk data tanpa nama panjang, misal nomor simcard)'],['nohead','Tabel: tanpa baris header (semua baris = data)'],['kv','Tabel label-nilai (kolom 1 = label, tanpa header)'],['pb','Mulai di halaman baru']]},
+ sum:{n:'Ringkasan kegiatan (otomatis)',f:[['h','Judul','i'],['body','Catatan tambahan di bawah ringkasan (opsional)','t']]},
+ text:{n:'Laporan tulisan',f:[['h','Judul bagian','i'],['body','Isi tulisan (**tebal** pakai dua bintang). Baris yang ada Terminal ID (nas_..., ldx_..., RCHT..., dst) otomatis dipecah jadi kolom. Kalau ada tabel dari tombol Tambah tabel, baris ini digabung ke tabel itu (jadi satu tabel)','t']],ck:[['plain','Tanpa nomor (untuk sub-judul)'],['num','Tabel: tambah kolom No otomatis'],['sp','Tabel: setiap spasi = kolom baru (untuk data tanpa nama panjang, misal nomor simcard)'],['nohead','Tabel: tanpa baris header (semua baris = data)'],['kv','Tabel label-nilai (kolom 1 = label, tanpa header)'],['pb','Mulai di halaman baru'],['ns','Jangan masukkan ke Ringkasan Kegiatan']]},
  note:{n:'Catatan tambahan',f:[['h','Judul kotak','i'],['body','Isi (**tebal** pakai dua bintang)','t']]},
- photos:{n:'Laporan foto',f:[['h','Judul lampiran','i']],ck:[['cn','Nomori caption otomatis (Foto 1., Foto 2., ...)'],['pb','Mulai di halaman baru']],photos:1}
+ photos:{n:'Laporan foto',f:[['h','Judul lampiran','i']],ck:[['hn','Beri nomor pada judul (lanjut urutan bagian)'],['cn','Nomori caption otomatis (Foto 1., Foto 2., ...)'],['pb','Mulai di halaman baru'],['ns','Jangan masukkan ke Ringkasan Kegiatan']],photos:1}
 };
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -182,7 +183,25 @@ function bodyHtml(b){
  }
  fp();ft();return {html:out,rows:mr};
 }
+function dataRows(b){
+ let t=b.g?b.g.length:0;
+ for(const l of String(b.body||'').split('\n'))if(splitRow(l,b.sp))t++;
+ if(!t)return 0;
+ return (hdArr(b)||b.nohead||t===1)?t:t-1;
+}
+function sumRows(){
+ const S=[];let n=0,cur=null;
+ for(const b of blocks){
+  if(b.t==='text'&&b.h&&!b.plain){n++;cur={n,h:b.h,d:b.kv?0:dataRows(b),f:0,ns:b.ns||b.kv};S.push(cur)}
+  else if(b.t==='photos'){if(b.h&&b.hn){n++;cur={n,h:b.h,d:0,f:0,ns:b.ns};S.push(cur)}if(cur)cur.f+=(b.p||[]).length}
+ }
+ return S.filter(x=>!x.ns);
+}
 function renderBlock(b,ctx){
+ if(b.t==='sum'){
+  const rows=sumRows().map(x=>[x.n+'. '+x.h,[x.d?x.d+' data':'',x.f?x.f+' foto':''].filter(Boolean).join(', ')||'-']);
+  return `<h2>${esc(b.h||'Ringkasan Kegiatan')}</h2>`+(rows.length?tbl(rows,false,false,['Kegiatan','Keterangan']):'<p class="empty">Belum ada bagian bernomor di laporan ini.</p>')+(b.body?`<p>${rich(b.body)}</p>`:'');
+ }
  if(b.t==='title')return `<h1>${esc(b.title)||'Judul laporan'}</h1><div class="sub">${esc(b.sub)}</div>`;
  if(b.t==='text'){
   let hd=b.pb?'<div class="pb"></div>':'';
@@ -193,7 +212,7 @@ function renderBlock(b,ctx){
  if(b.t==='note')return `<div class="note"><b class="t">${esc(b.h)}</b>${rich(b.body)}</div>`;
  if(b.t==='photos'){
   const p=b.p||[],c=b.cols||3;
-  return (b.pb?'<div class="pb"></div>':'')+(b.h?`<div class="cap">${esc(b.h)}</div>`:'')+(p.length?`<div class="grid" style="grid-template-columns:repeat(${c},1fr);--ih:${({1:'172mm',2:'118mm',3:'80mm',4:'60mm'})[c]||'110mm'}">${p.map((x,j)=>`<div class="cell${c==1?' w':''}"><div class="im"><img src="${x.s}" alt="${esc(x.c)}"></div><span>${esc(b.cn?'Foto '+(j+1)+'. '+x.c:x.c)}</span></div>`).join('')}</div>`:'<p class="empty">Belum ada foto, upload dari panel kiri</p>');
+  return (b.pb?'<div class="pb"></div>':'')+(b.h?(b.hn?(ctx.n++,`<h2>${ctx.n}. ${esc(b.h)}</h2>`):`<div class="cap">${esc(b.h)}</div>`):'')+(p.length?`<div class="grid" style="grid-template-columns:repeat(${c},1fr);--ih:${({1:'172mm',2:'118mm',3:'80mm',4:'60mm'})[c]||'110mm'}">${p.map((x,j)=>`<div class="cell${c==1?' w':''}"><div class="im"><img src="${x.s}" alt="${esc(x.c)}"></div><span>${esc(b.cn?'Foto '+(j+1)+'. '+x.c:x.c)}</span></div>`).join('')}</div>`:'<p class="empty">Belum ada foto, upload dari panel kiri</p>');
  }
  return '';
 }
@@ -239,7 +258,7 @@ async function upload(i,files){
 }
 
 $('#add').innerHTML=Object.entries(TYPES).filter(([k])=>k!=='title').map(([k,v])=>`<button data-add="${k}">+ ${v.n}</button>`).join('');
-$('#add').onclick=e=>{const k=e.target.dataset.add;if(!k)return;blocks.push(k==='photos'?{t:k,cols:3,p:[]}:{t:k});all();$('#editor').lastElementChild?.scrollIntoView({block:'nearest'})};
+$('#add').onclick=e=>{const k=e.target.dataset.add;if(!k)return;const nb=k==='photos'?{t:k,cols:3,p:[]}:k==='sum'?{t:k,h:'Ringkasan Kegiatan'}:{t:k};if(k==='sum')blocks.splice(1,0,nb);else blocks.push(nb);all();$('#editor').children[k==='sum'?1:blocks.length-1]?.scrollIntoView({block:'nearest'})};
 $('#editor').addEventListener('input',e=>{
  const d=e.target.dataset;if(d.i===undefined||d.up!==undefined)return;
  if(d.hv!==undefined){const bb=blocks[d.i];if(!bb.hv)bb.hv=Array.from({length:cols(bb)},()=>'');bb.hv[d.hv]=e.target.value;paper();return}
